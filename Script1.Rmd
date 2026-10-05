@@ -1,0 +1,50 @@
+---
+title: "Week 1: Basics of R Programming"
+output: html_document
+date: "2026-09-15"
+---
+
+#R Interface
+
+```{r intro}
+
+# Welcome to R!
+#This is an **R Notebook**. Text goes here, and code goes inside the grey **chunks**.
+
+```
+
+
+```{r}
+#To run a line of code, press `Ctrl + Enter` (Windows) or `Cmd + Return` (Mac).
+```
+
+
+```{r}
+#R treats the hashtag character, #, in a special way; R will not run anything that follows a hashtag on a line. This makes hashtags very useful for adding comments and annotations to your code. Humans will be able to read the comments, but your computer will pass over them.
+```
+
+
+```{r}
+#command and execution
+
+1+1
+
+100:130
+
+##The number in square brackets at the start of each line tells you the POSITION of the first value on that line within the overall result -- e.g. [16] means the line starts with the 16th value. This number depends on how wide your console/pane is, so it may differ on your screen. You can mostly ignore it.
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
