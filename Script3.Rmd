@@ -209,6 +209,12 @@ args(round)
 ```
 
 
+## Sources
+```{r}
+#Course materials are primarily adapted from:
+##Grolemund, G. *Hands-On Programming with R*. Free online edition: https://rstudio-education.github.io/hopr/
+
+```
 
 
 
