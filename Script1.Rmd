@@ -34,9 +34,12 @@ date: "2026-09-15"
 ##The number in square brackets at the start of each line tells you the POSITION of the first value on that line within the overall result -- e.g. [16] means the line starts with the 16th value. This number depends on how wide your console/pane is, so it may differ on your screen. You can mostly ignore it.
 ```
 
+## Sources
+```{r}
+#Course materials are primarily adapted from:
+##Grolemund, G. *Hands-On Programming with R*. Free online edition: https://rstudio-education.github.io/hopr/
 
-
-
+```
 
 
 
