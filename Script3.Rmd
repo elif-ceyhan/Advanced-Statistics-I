@@ -1,0 +1,214 @@
+---
+title: "Week 3: Custom Functions, Packages, and Visualization"
+output: html_notebook
+---
+
+
+##Writing Your Own Function
+
+
+```{r}
+#Remember last week when calling dice gave us the exact same number every time? 
+##That's because dice stored the result, not the action. 
+##Today, we fix that creating the roll() function.
+```
+
+
+```{r}
+#Functions may seem mysterious, but they are just another type of R object. 
+##Instead of containing data, they contain code. 
+```
+
+
+```{r}
+#This was our code that we run last week. 
+
+die <- 1:6 
+dice <- sample(die, size = 2, replace = TRUE) 
+dice 
+sum(dice)
+
+#You can retype this code into the console anytime you want to re-roll your dice. 
+
+#However, this is an awkward way to work with the code. 
+#It would be easier to use your code if you wrapped it into its own function.
+```
+
+
+```{r}
+#To save an action in R, we use function(). 
+##A function has three parts: a name, the function() keyword, and code inside curly braces {}.
+```
+
+
+###roll() Virtual Die
+
+```{r}
+roll <- function() {
+  die <- 1:6
+  dice <- sample(die, size = 2, replace = TRUE)
+  sum(dice)
+}
+
+roll()
+```
+
+```{r}
+#You can think of the parentheses as the “trigger” that causes R to run the function.
+##If you type in the name with the parentheses, R will run that code:
+roll()
+
+##If you type in a function’s name without the parentheses, R will show you the code that is stored inside the function.
+roll
+```
+
+```{r}
+#What if we removed one line of code from our function and changed the name die to bones, like this? 
+roll2 <- function() { 
+  dice <- sample(bones, size = 2, replace = TRUE) 
+  sum(dice) 
+}
+
+roll2()
+#Now I’ll get an error when I run the function. 
+##The function needs the object bones to do its job, but there is no object named bones to be found.
+```
+
+```{r}
+## (This code is stored in a special format that makes it easy to reuse the code in new situations.)
+## (You can write your own functions by recreating this format.)
+```
+
+
+```{r}
+#Either I define "bones" like this (1):
+roll2 <- function() { 
+  bones <- 1:6
+  dice <- sample(bones, size = 2, replace = TRUE) 
+  sum(dice) }
+
+roll2()
+```
+
+
+```{r}
+#Or like this (2):
+roll2 <- function(bones) { 
+  dice <- sample(bones, size = 2, replace = TRUE) 
+  sum(dice) }
+
+roll2(bones = 1:6)
+```
+
+
+```{r}
+#Or like this (3):
+roll2 <- function(bones = 1:6) { 
+  dice <- sample(bones, size = 2, replace = TRUE) 
+  sum(dice) 
+}
+
+roll2()
+```
+
+
+
+```{r}
+#Once you’ve created your function, R will treat it like every other function in R. 
+##Think about how useful this is. Have you ever tried to create a new Excel option and add it to Microsoft’s menu bar?
+```
+
+
+
+
+#2nd Chapter: R Packages & Basic Plotting
+
+```{r}
+#Think of installing a package as downloading an app from the App Store. You use install.packages() once per computer.
+#Running library() is like tapping the app icon to open it. You need to call library(ggplot2) every time you open a new RStudio session.
+```
+
+
+```{r}
+# Step 1: Install (commented out so it doesn't run automatically every time)
+#install.packages("ggplot2")
+
+# Step 2: Load the package into memory
+library(ggplot2)
+```
+
+
+```{r}
+#Let's roll dice 10,000 times using sample() and see if our dice are fair. 
+##qplot() gives us a quick bar chart of the results.
+
+rolls <- replicate(10000, roll())
+qplot(rolls, binwidth = 1)
+
+# Fair die
+# This is an unbiased random sample -- statistically, each face of the die has an equal chance of coming up: 1/6. 
+# In a moment we'll see how adding prob breaks this.
+```
+
+
+
+
+```{r}
+args(sample)
+
+# prob (in sample function) assigns a probability to each face of the die (1:6), instead of the default equal chance (1/6 each).
+# Here, faces 1-5 each have a 1/8 chance, but face 6 has 3/8 -- three times more likely.
+# This simulates a "loaded" die, biased toward high numbers.
+```
+
+
+```{r}
+roll <- function() 
+{ die <- 1:6 
+  dice <- sample(die, size = 2, replace = TRUE, prob = c(1/8, 1/8, 1/8, 1/8, 1/8, 3/8)) 
+  sum(dice) }
+
+#Quick math reminder: probabilities always have to add up to 1 (= 100%), because together they must cover EVERY possible outcome -- one of the six faces is guaranteed to come up.
+#When all faces are equally likely: 6 x (1/6) = 1.
+#Here we're weighting them unevenly instead, but the total still has to equal 1: 5 x (1/8) + 3/8 = 8/8 = 1.
+#The denominator (8) isn't about the number of faces (6) -- it's the total of the "shares" we're splitting among them.
+
+#prob is matched position by position with die: prob[1] is the probability of die[1], prob[2] of die[2], and so on.
+#Since die <- 1:6, position 6 holds the value 6 -- so prob's 6th value (3/8) is the probability of rolling a 6.
+#That means a 6 is three times more likely to come up than any other face (3/8 vs 1/8) -- this is exactly what makes the die "loaded," and why high sums become more common.
+```
+
+
+```{r}
+#Let's roll a die 1,000 times using sample() and see if our die is fair. qplot() gives us a quick bar chart of the results.
+
+library(ggplot2)
+rolls <- replicate(10000, roll()) 
+qplot(rolls, binwidth = 1)
+
+
+#generally speaking our graphs looks like this.
+#The dice are now clearly biased towards high numbers, since high sums occur much more often than low sums.
+
+# Rolling this biased die 10,000 times and plotting the sums shows the skew clearly:
+# high totals (closer to 12) show up far more often than they would with a fair die.
+# This is a simple stand-in for biased sampling/measurement in real research.
+```
+
+
+
+#Getting Help in R
+
+```{r}
+# Open the official documentation pane (bottom-right)
+?sample
+
+# View only the arguments of a function directly in the console
+args(sample)
+args(round)
+```
+
+
+
+
+
