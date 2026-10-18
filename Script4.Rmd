@@ -1,0 +1,180 @@
+---
+title: "Week 4: R Objects – I (Atomic Vectors, Coercion, Factors)"
+output: html_notebook
+---
+
+# Quick Transition
+
+```{r}
+#We move on to R's basic "data objects": how values are stored, how R silently mixes types together (coercion), and how we represent variables as "factors" in R.
+```
+
+# Atomic Vectors
+
+```{r}
+#An "atomic vector" is a one-dimensional sequence of values of the same type. 
+#We build one with c() -- remember our "die" object? That was actually an atomic vector too.
+#“c() stands for combine — it combines (glues together) separate values into a single vector.”
+
+die <- c(1, 2, 3, 4, 5, 6)
+die
+
+is.vector(die)  ## TRUE
+length(die)     ## 6
+```
+
+```{r}
+#Even a single value is really just a vector of length 1:
+
+five <- 5
+is.vector(five) ## TRUE
+length(five)    ## 1
+```
+
+```{r}
+#names() lets you attach labels to a vector's elements. 
+##This does NOT change the values, it just adds a label on top of them.
+
+names(die) <- c("one", "two", "three", "four", "five", "six")
+die
+
+die + 1  #Names survive operations too
+## "one" still labels the 1st slot -- but its value is now 2, not 1. Labels stick to positions, not to specific numbers.
+
+names(die) <- NULL  #Assign NULL to remove the names
+die
+```
+
+```{r}
+#Why label at all? 
+##So you can refer to an element by a meaningful name instead of remembering its position number -- e.g. die["three"] instead of die[3]. 
+##This becomes especially useful later with survey items, regression coefficients, or table() output, where names are added automatically.
+```
+
+
+```{r}
+ages <- c(23, 19, 31, 27)
+names(ages) <- c("Aylin", "Baran", "Cem", "Deniz")
+ages
+
+#Without names, you'd have to remember "Cem is the 3rd participant":
+ages[3]        ## 31 -- but which participant is this? You'd have to check.
+
+#With names, it's self-explanatory:
+ages["Cem"]    ## 31 -- immediately clear whose age this is
+
+#Names also stay correctly attached during operations -- e.g. everyone's age next year:
+ages + 1       ## Aylin=24, Baran=20, Cem=32, Deniz=28 -- still the right label on the right person
+```
+
+
+
+# Types of Vectors
+
+```{r}
+#Before we look at coercion, let's quickly meet the four basic types a vector can hold.
+
+colors <- c("red", "blue", "green")   #CHARACTER -- text, always shown in quotes
+colors
+typeof(colors)  ## "character"
+
+scores <- c(88.5, 92, 76.3)           #NUMERIC (technically "double") -- numbers, decimals allowed, no quotes
+scores
+typeof(scores)  ## "double"
+
+passed <- c(TRUE, FALSE, TRUE)        #LOGICAL -- only TRUE/FALSE, no quotes
+passed
+typeof(passed)  ## "logical"
+```
+
+
+```{r}
+#INTEGER is a special case of numeric: whole numbers only, no decimals. 
+#R usually gives you "double" by default -- you get "integer" mainly when you use : to build a sequence (like our die!), or add an L after a number.
+
+die <- 1:6
+typeof(die)   ## "integer" -- because we used ":"
+
+typeof(5)     ## "double"  -- a plain number is double by default
+typeof(5L)    ## "integer" -- the L forces it to be integer
+
+#So "numeric" is really an umbrella term covering both double and integer.
+```
+
+```{r}
+#A quick note on terminology, since it differs from SPSS:
+#SPSS's nominal/ordinal/scale describe what a variable MEANS (measurement level).
+#R's character/double/integer/logical describe how a value is STORED (data type) -- a separate question.
+#Integer just means "whole number, stored efficiently" -- it says nothing about whether the variable is nominal, ordinal, or continuous.
+#Rough mapping: SPSS "scale" variables usually become double in R; SPSS nominal/ordinal categories are usually represented as factors (which, as we just saw, store integers underneath).
+```
+
+```{r}
+#A quick note on terminology, since it differs from jamovi:
+#jamovi's Nominal/Ordinal/Continuous describe what a variable MEANS (measurement level).
+#R's character/double/integer/logical describe how a value is STORED (data type) -- a separate question.
+#Integer just means "whole number, stored efficiently" -- it says nothing about whether the variable is nominal, ordinal, or continuous.
+#Rough mapping: jamovi "Continuous" variables usually become double in R; jamovi Nominal/Ordinal categories are usually represented as factors (which, as we just saw, store integers underneath).
+```
+
+
+```{r}
+#Now that we know these four types, watch what happens when we put more than one type into the SAME vector:
+```
+
+# Coercion
+
+```{r}
+#In R, ALL elements of an atomic vector must be the same type. 
+##If you mix types, R silently converts everything to the "most flexible" type: character > numeric > logical.
+
+card <- c("ace", "hearts", 1)
+card  ## Everything became "character" -- even the 1 turned into the string "1"
+```
+
+```{r}
+#Logical values turn into 1/0 when mixed with numbers. That's why summing a logical vector counts the TRUEs:
+
+sum(c(TRUE, TRUE, FALSE, FALSE))  ## 2
+```
+
+```{r}
+#Instead of relying on silent coercion, you can also convert explicitly:
+
+as.character(1)    ## "1"
+as.logical(1)      ## TRUE
+as.numeric(FALSE)  ## 0
+
+```
+
+# Factors -- Translating Psychological Variables into Code
+
+```{r}
+#We represent categorical psychological variables (experimental condition, education level, etc.) as "factors" in R. 
+#Under the hood, a factor is really an integer vector -- with a "levels" attribute acting as a label on top.
+
+condition <- factor(c("treatment", "control", "control", "treatment"))
+condition
+
+typeof(condition)   ## "integer" -- surprising, right? It looks like text but it's actually numbers.
+attributes(condition)
+
+#A factor is really just an integer vector wearing a costume: typeof() shows the raw integers underneath, while class() = "factor" tells R to display each integer using its levels label instead of the number itself.
+```
+
+```{r}
+#unclass() shows you what a factor REALLY stores underneath:
+
+unclass(condition)
+```
+
+```{r}
+#WATCH OUT -- a common student mistake: as.character() converts a factor to its DISPLAYED label, not to the underlying integer code:
+
+as.character(condition)  ## "treatment" "control" "control" "treatment"
+
+condition_chr <- as.character(condition)
+typeof(condition_chr)
+```
+
+
