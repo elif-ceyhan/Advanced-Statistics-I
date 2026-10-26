@@ -1,0 +1,153 @@
+---
+title: "Week 5: R Objects – II (Matrices, Lists, Data Frames, Loading & Saving Data)"
+output: html_notebook
+---
+
+# Quick Transition
+
+```{r}
+#Last week we covered atomic vectors, coercion, and factors -- remember how our "card" object got turned entirely into character due to coercion? We'll reuse it today, but this time we'll AVOID coercion: with lists and data frames.
+```
+
+# Matrices
+
+```{r}
+#matrix() reshapes a vector into 2 dimensions (rows x columns). 
+##By default it fills column by column:
+
+die <- c(1, 2, 3, 4, 5, 6)
+
+m <- matrix(die, nrow = 2)
+m
+```
+
+```{r}
+#With byrow = TRUE, it fills row by row instead:
+
+m <- matrix(die, nrow = 2, byrow = TRUE)
+m
+```
+
+# Lists
+
+```{r}
+#Last week "card" was an atomic vector, and coercion turned even the 1 into the string "1":
+
+card_vector <- c("ace", "hearts", 1)
+typeof(card_vector[[3]])  ## "character" -- coercion happened
+```
+
+```{r}
+#list() is different: elements can STAY different types, no coercion happens.
+
+card <- list("ace", "hearts", 1)
+card
+
+card[[3]]
+
+typeof(card[[3]])  ## "double" -- still a number!
+```
+```{r}
+#A more realistic use case: bundling different pieces of info about ONE participant together.
+#This only works cleanly with a list -- an atomic vector would coerce everything to character.
+
+participant <- list(name = "Ayla", age = 23, passed_screening = TRUE)
+participant
+
+typeof(participant$age)               ## "double" -- still a number
+typeof(participant$passed_screening)  ## "logical" -- still TRUE/FALSE
+
+#Preview: when you run t.test() or lm() later this semester, the result you get back
+#is ALSO a list -- it bundles numbers, labels, and text together the same way.
+```
+
+
+
+# Data Frames
+
+```{r}
+#A data frame bundles equal-length vectors together as columns, forming a table. 
+##It's actually a special list with the class "data.frame".
+
+df <- data.frame(
+  participant = 1:4,
+  condition = c("treatment", "control", "control", "treatment"),
+  score = c(88, 76, 81, 92)
+)
+
+df
+
+typeof(df)   ## "list"
+class(df)    ## "data.frame"
+```
+
+
+```{r}
+#Note: (this will differ from the textbook's output -- not an error!): the book was written for an older R version. Since R 4.0, data.frame() no longer automatically converts character columns to factors. 
+
+##When you run str(), you'll see the "condition" column as chr, not Factor.
+
+str(df)
+```
+
+```{r}
+#If you want a column to be a factor on purpose, wrap it explicitly with factor():
+
+df$condition <- factor(df$condition)
+str(df)
+```
+
+# Loading & Saving Data
+
+```{r}
+#write.csv() lets you save a data frame as plain text (.csv). row.names = FALSE stops R from adding an extra row-number column.
+
+write.csv(df, file = "week4_demo.csv", row.names = FALSE)
+
+getwd()  #Shows you where the file was saved
+```
+
+```{r}
+#Load it back in with read.csv():
+
+df2 <- read.csv("week4_demo.csv")
+head(df2)
+str(df2)
+
+#Watch out: saving and reloading can sometimes silently change a column's type (e.g., "score" may come back as "int" instead of "num" here) -- so it's good practice to always check with str() after loading data. In upcoming weeks, we'll load the real TGSS survey data the same way.
+```
+
+##Different Formats
+
+```{r}
+#You can also export a data frame to other common formats researchers use:
+
+#SPSS (.sav) -- needs the haven package (install.packages("haven") once, if you haven't already)
+library(haven)
+write_sav(survey, "survey.sav")
+
+#Excel (.xlsx) -- needs the writexl package (install.packages("writexl") once, if you haven't already)
+library(writexl)
+write_xlsx(survey, "survey.xlsx")
+
+#Reading them back in works the same way, just with matching functions:
+survey_from_spss <- read_sav("survey.sav")
+survey_from_excel <- readxl::read_excel("survey.xlsx")  # needs the readxl package
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
