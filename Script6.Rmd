@@ -1,0 +1,353 @@
+---
+title: "Week 6: R Notation & Modifying Values (Subsetting, Logical Operators, Modifying Values, Missing Data)"
+output: html_notebook
+---
+
+```{r}
+#Last week we built small data frames ourselves (survey, clinic...) and learned how to save and load them:
+##write.csv() / read.csv() for .csv files, and write_sav() / read_sav() from the haven package for SPSS files.
+##We also saw that saving and reloading can quietly change a column's type -- so we always check with str().
+
+#Today we finally open a REAL survey: TGSS 2024. Real data is big (thousands of people, hundreds of questions) and messy.
+##To work with it, we need four skills, and they are the four parts of today's class:
+##(1) R notation: pulling out only the rows and columns we need (subsetting)
+##(2) Logical operators: asking TRUE/FALSE questions about the data ("Who is older than 30?")
+##(3) Modifying values: changing values that are wrong or need to be recoded
+##(4) Missing data: recognizing and handling missing answers -- the most common "mess" in survey data
+```
+
+# Loading the TGSS 2024 Data
+
+```{r}
+#What is TGSS? The Turkish General Social Survey (Türkiye Genel Sosyal Saha Araştırması) is a nationally representative survey:
+##2,615 people across Türkiye answered questions on family, health, wellbeing, religion, work, politics and more (fieldwork: May-June 2024).
+##If you ever use it in a paper or thesis, you must cite it:
+##Nişancı, Z. et al. (2026). Turkish General Social Survey (TGSS) 2024: Dataset. https://doi.org/10.5281/zenodo.18721350
+
+#The data comes as an SPSS file (.sav), so we need read_sav() from the haven package.
+##Remember from our packages week: install.packages("haven") only once per computer, but library(haven) at the start of EVERY session.
+library(haven)
+
+#read_sav() reads the file, and <- stores it in an object called tgss.
+##The file must be in your working directory (check with getwd(), as in Week 5) -- or write the full path to the file.
+tgss <- read_sav("TGSS2024.sav")
+
+#dim() gives the DIMENSIONS of the data: first the number of rows, then the number of columns.
+##In survey data: one row = one respondent (person), one column = one variable (usually one question).
+dim(tgss)
+```
+
+```{r}
+#Before we clean anything, let's take a first look at ONE variable: happy
+##The question was: "All things considered, how happy do you feel?" (1 = extremely unhappy ... 5 = extremely happy)
+##tgss$happy pulls out the whole "happy" column: one answer per respondent, 2,615 answers in total.
+##Printing all of them would flood the screen, so head() shows only the FIRST 6 values -- a quick look at the variable.
+
+head(tgss$happy)
+
+#How to read the output:
+##The first line of numbers = the answers of the first 6 respondents (e.g. a 5 means "extremely happy").
+##Below it, R adds a "Labels" table. This is the SPSS value-label dictionary that came with the file:
+##Notice that the missing-data codes are in the dictionary too: -88 = don't know, -99 = refused, -90 = not applicable.
+##For R, these codes are still just numbers -- this will become a problem later today (see "Missing Data").
+```
+
+```{r}
+#IF YOU GET EN ERROR, SOLUTION FOR THIS SESSION:
+Sys.setlocale("LC_CTYPE", "English_United States.utf8")
+```
+
+
+```{r}
+#So what kind of object is this column? Remember typeof() vs class() from Week 4:
+##typeof() tells you how the data is STORED, class() tells you how R TREATS it.
+
+typeof(tgss$happy)  #"double" -- underneath, the answers are stored as plain numbers
+class(tgss$happy)   #"haven_labelled" (+ some technical extras) -- R's special type for SPSS labels
+
+##Today we remove them with zap_labels() and use the codebook instead. We'll bring labels back when we need them for plots.
+```
+
+```{r}
+#ALWAYS keep the codebook open next to the data!
+##Variable names are short codes (happy, lifesat, trustpeople...), and once the labels are removed, the answers are just NUMBERS.
+##Only the codebook tells you what each number means (e.g. gender: 1 = Male, 2 = Female).
+##The codebook also tells you the exact question wording.
+
+#The full dataset has hundreds of columns -- far too many to look at comfortably.
+##So we make a list of the variables we need today (a character vector, Week 4!)...
+vars <- c("id", "age", "gender", "marital", "happy", "lifesat", "health", "trustpeople", "sharenum",
+          "weldepp", "welhard", "welsleep", "welhappy", "welalone", "welenjoy", "welsad", "welstop",
+          "sleephour", "qform")
+
+#...and keep only those columns. tgss[, vars] means "all rows, only these columns".
+##This is already SUBSETTING -- today's main topic.
+tg <- tgss[, vars]
+
+class(tg) #"tbl_df"     "tbl"        "data.frame"
+##"tbl_df" "tbl" "data.frame" -- a TIBBLE: a modern version of a data frame that read_sav() creates.
+
+##It is still a data frame, but a few small things behave differently from what we learn today.
+##So we turn it into a classic data frame, the same kind we built in Week 5:
+tg <- as.data.frame(tg)
+class(tg) #"data.frame"
+
+#the COLUMNS still carry the SPSS labels:
+class(tg$happy)   #still "haven_labelled"
+
+##zap_labels() removes the labels, so every column becomes plain numbers:
+tg <- zap_labels(tg)
+class(tg$happy)   #"numeric"
+
+#You can combine two process together as well:
+#tg <- as.data.frame(zap_labels(tg))
+
+#head() on a whole data frame shows the first 6 ROWS of every column -- the first 6 respondents.
+head(tg)
+
+#str() shows the STRUCTURE: how many respondents (obs.) and variables, each column's type, and its first values.
+##It's the best "first look" at any dataset -- use it every time you load data.
+str(tg)  
+
+#You may see extra lines like ..- attr(*, "format.spss"): leftover SPSS formatting info, you can ignore them
+```
+
+# Selecting Values (R Notation)
+
+```{r}
+#To pull values out of a data frame, write its name followed by square brackets: tg[rows, columns]
+##Think of the data frame as a table: the part BEFORE the comma picks rows (respondents),
+##the part AFTER the comma picks columns (variables). There are several ways to say which ones you want.
+```
+
+
+```{r}
+#1) Positive integers: "give me these positions"
+tg[1, 2]  #row 1, column 2 -> the first respondent's age (age is the 2nd column)
+
+#or do this instead:
+tg[1, "age"]
+
+tg[1, c(2, 3, 5)] #row 1, columns 2, 3 and 5 -> c() lets you ask for several positions at once
+
+tg[1:3, 2:5]  #rows 1 to 3, columns 2 to 5 -> the colon operator (from our first weeks) creates a sequence of positions
+```
+
+```{r}
+#2) Blank space: leaving one side of the comma EMPTY means "give me everything" in that dimension
+
+tg[1:3, ]      #rows 1 to 3, ALL columns (nothing after the comma)
+
+tg[, 2]  #ALL rows of column 2 (nothing before the comma)
+
+```
+
+```{r}
+#3) Negative integers: a minus sign means "give me everything EXCEPT these"
+
+tg[1:3, -1]    #rows 1 to 3, every column except the first one (id)
+
+#Don't forget the comma! 
+
+#tg[1:3] (no comma) does something different with data frames -- always write [rows, columns].
+
+```
+
+
+```{r}
+#4) Names: you can also ask for columns by their names, in quotes
+##This is usually the safest choice: column positions can change (if you add or remove columns), but names don't.
+tg[1:5, c("age", "gender", "happy")]
+
+```
+
+```{r}
+#5) Logical values: TRUE = keep, FALSE = drop -- one TRUE/FALSE for each element
+
+##We try it on a short vector first: the ages of the first 5 respondents.
+
+first_ages <- tg$age[1:5]   #a vector has no rows/columns, so only ONE index inside the brackets
+first_ages
+
+
+first_ages[c(TRUE, FALSE, TRUE, FALSE, FALSE)]  #keeps only the 1st and 3rd values
+
+##Typing TRUE/FALSE by hand looks pointless now -- but it becomes the most powerful tool of the day in the "Logical Operators" part.
+```
+
+
+```{r}
+#The dollar sign $ and double brackets [[ ]] (Week 5!) both pull out ONE whole column as a plain vector:
+head(tg$happy)
+head(tg[["happy"]])  #same result -- $ is just shorter to type
+
+#Watch out: what you get back depends on how many columns you ask for.
+tg[, "age"]
+tg[, c("age", "happy")]
+
+##ONE column comes back as a vector, TWO OR MORE columns come back as a data frame:
+class(tg[, "age"])             #"numeric" -- a plain vector
+class(tg[, c("age", "happy")]) #"data.frame" -- still a table
+
+```
+
+
+
+# Logical Operators
+
+```{r}
+#A logical operator asks a TRUE/FALSE question -- and R answers it for EVERY value at once:
+##  >   greater than              >=  greater than or equal to
+##  <   less than                 <=  less than or equal to
+##  ==  equal to (TWO = signs!)   !=  not equal to
+##  %in%  "is this value one of these values?"
+
+head(tg$age)        #the first 6 ages...
+head(tg$age > 30)   #...and the answer to "older than 30?" for each of them: one TRUE/FALSE per respondent
+```
+
+
+```{r}
+#Remember coercion from Week 4: when you do math with TRUE/FALSE, TRUE becomes 1 and FALSE becomes 0.
+##That gives us a very useful trick for survey data:
+sum(tg$age > 30)   #adds up the 1s -> HOW MANY respondents are older than 30
+
+#any() and all() summarize a whole TRUE/FALSE vector into a single answer:
+##any() = "is at least one TRUE?"   all() = "are all of them TRUE?"
+
+##A real question about our data: does TGSS include anyone younger than 18?
+any(tg$age < 18)
+all(tg$age >= 18)
+```
+
+
+```{r}
+#%in% checks whether each value belongs to a group of values.
+##In the codebook, marital: 5 = divorced, 6 = widowed. So this asks: "is this person divorced OR widowed?"
+head(tg$marital %in% c(5, 6))
+
+sum(tg$marital %in% c(5, 6))  #how many respondents are divorced or widowed
+
+#WATCH OUT -- the most common mistake: = and == are NOT the same thing!
+##=  is used for arguments inside functions (e.g. na.rm = TRUE)
+
+##== asks the question "is it equal to?"
+sum(tg$gender == 2)   #how many women (gender: 2 = Female)
+
+(tg$gender == 2) 
+```
+
+```{r}
+#Boolean operators COMBINE several TRUE/FALSE questions into one:
+##  &  AND -- TRUE only if BOTH conditions are TRUE
+##  |  OR  -- TRUE if AT LEAST ONE condition is TRUE
+##  !  NOT -- flips the answer: TRUE becomes FALSE and FALSE becomes TRUE
+
+sum(tg$gender == 2 & tg$age < 30)      #women AND younger than 30 -> young women
+sum(tg$age < 25 | tg$age > 70)         #younger than 25 OR older than 70 -> the youngest and the oldest respondents
+sum(!(tg$marital %in% c(5, 6)))        #NOT (divorced or widowed) -> everyone else
+
+#Tip: when you combine conditions, use parentheses to make your question clear, like in the last line.
+```
+
+
+```{r}
+#Now the big idea of the day -- LOGICAL SUBSETTING:
+##Put a TRUE/FALSE question in the ROW position, and R keeps only the rows where the answer is TRUE.
+##(Remember point 5 above: TRUE = keep, FALSE = drop. Now R writes the TRUE/FALSE vector for us!)
+
+young_women <- tg[tg$gender == 2 & tg$age < 30, ]   #nothing after the comma = keep all columns
+nrow(young_women)   #nrow() counts the rows: how many respondents are in this new, smaller data frame
+
+#You can choose rows by a condition AND columns by name at the same time:
+very_happy <- tg[tg$happy == 5, c("age", "gender", "trustpeople")]  #happy: 5 = "extremely happy"
+head(very_happy)
+
+##Notice the row numbers on the left: they show which rows of tg were kept.
+```
+
+# Modifying Values
+
+```{r}
+#To change a value: select it with the same notation as above, then assign a new value with <-
+##We practice on a small copy first, so the real data stays safe:
+practice_ages <- tg$age[1:5]
+practice_ages
+
+practice_ages[1] <- 99           #change ONE value: the 1st element becomes 99
+practice_ages
+
+practice_ages[c(2, 3)] <- 0      #change SEVERAL values at once: the 2nd and 3rd elements become 0
+practice_ages
+
+#Changing practice_ages does NOT change tg -- it is a separate copy. Run head(tg$age) to check!
+```
+
+```{r}
+#Now combine logical subsetting with assignment: "find every value that meets a condition, then replace it"
+##Read the line below as: "in practice_ages, wherever the value is above 50, put 50"
+practice_ages[practice_ages > 50] <- 50
+practice_ages
+
+#This one pattern -- x[condition] <- new_value -- is the key move for cleaning survey data.
+##Remember it: we will use it on the real data in the Missing Data part.
+```
+
+```{r}
+#Adding a new column: just assign something to a column name that doesn't exist yet
+tg$older <- tg$age >= 65   #a TRUE/FALSE column: is this respondent 65 or older?
+head(tg[, c("age", "older")])
+
+#Removing a column: assign NULL ("nothing") to it
+tg$older <- NULL
+names(tg)   #names() lists the column names -- "older" is gone
+```
+
+# Missing Data
+
+```{r}
+#In R, a missing value is written as NA ("Not Available").
+##In the codebook, missing answers have special codes: -88 = "Don't know", -99 = "Refused to answer",
+##-90 = "Not applicable" (the question was not asked to this person).
+##But in our data you will NOT see these numbers: in the SPSS file, these answers were stored as "missing",
+##so read_sav() turned them into NA when it loaded the data. (zap_labels() has nothing to do with it -- it only removed the labels.)
+
+#Let's look at trustpeople: "How much do you trust people?" (0 = you can't be too careful ... 10 = most people can be trusted)
+##table() counts how many times each value appears -- a frequency table:
+table(tg$trustpeople)   #answers 0 to 10... but where are the people who didn't answer?
+```
+
+```{r}
+#WATCH OUT: table() silently leaves out the NAs! Add useNA = "ifany" to see them:
+table(tg$trustpeople, useNA = "ifany")   #now there is an extra <NA> column at the end
+
+
+
+#Use is.na(): it answers "is this value missing?" with TRUE or FALSE
+
+is.na(tg$trustpeople) #It answers the question ‘is this value missing?’ for every value.
+
+head(is.na(tg$trustpeople))
+
+sum(is.na(tg$trustpeople))   #counts the TRUEs -> how many respondents have no answer
+```
+
+```{r}
+#NAs also affect calculations:
+mean(tg$trustpeople)                 #NA! If even one value is unknown, R says the mean is unknown too
+mean(tg$trustpeople, na.rm = TRUE)   #na.rm = TRUE means "remove the NAs, then calculate" (rm = remove)
+
+#The same happens when we count with sum():
+sum(tg$trustpeople > 5)                 #NA -- for people with no answer, R can't tell if they are above 5
+sum(tg$trustpeople > 5, na.rm = TRUE)   #how many respondents chose a value above 5
+```
+
+
+```{r}
+#Finally, an overview: how many NAs does each variable have?
+##colSums() adds up each column separately -- combined with is.na(), it counts the NAs per variable:
+colSums(is.na(tg))
+
+```
+
+
