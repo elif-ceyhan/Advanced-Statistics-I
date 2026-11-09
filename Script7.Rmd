@@ -1,0 +1,285 @@
+---
+title: "Week 7: Data Visualization (Grammar of Graphics, Basic Geoms, Facets, Positions & Themes)"
+output: html_notebook
+---
+
+```{r}
+#Last week we learned to work with real survey data: selecting rows and columns, asking TRUE/FALSE questions,
+##changing values and handling missing answers (NA).
+
+#Today we turn data into PICTURES. A good plot shows in seconds what a table of 2,615 numbers can't:
+##how answers are distributed, how two variables are related, and how groups differ.
+##Today's plan:
+##(1) Prepare the data (just like last week)
+##(2) The grammar of graphics: the three ingredients of every ggplot
+##(3) Plotting ONE variable: histograms and bar charts
+##(4) Plotting TWO (or three) variables: boxplots and scatterplots
+##(5) Comparing groups with facets
+##(6) Positions: stacked, side-by-side and jittered
+##(7) Making it look good: titles, themes, and saving your plot
+```
+
+# Preparing the Data
+
+```{r}
+#ggplot2 is the plotting package we use. You already installed it in our packages week (remember qplot()?),
+##so we only need to load it -- at the start of EVERY session, together with haven:
+library(ggplot2)
+library(haven)
+
+#Load the TGSS data, exactly like last week:
+tgss <- read_sav("TGSS2024.sav")
+
+#Keep only the variables we need today:
+##age, gender, happy ("How happy do you feel?" 1-5), trustpeople ("How much do you trust people?" 0-10),
+##height (in cm) and weight (in kg)
+tg <- tgss[, c("id", "age", "gender", "happy", "trustpeople", "height", "weight")]
+
+#The same two clean-up steps as last week:
+tg <- as.data.frame(tg)   #tibble -> classic data frame
+tg <- zap_labels(tg)      #remove the SPSS labels -> plain numbers
+
+str(tg)
+```
+
+```{r}
+#Last week we said: "We'll bring labels back when we need them for plots." That time is now!
+##Why? ggplot looks at the TYPE of a variable to decide how to draw it:
+##numbers are treated as continuous (a smooth scale), factors are treated as categories (separate groups).
+##gender and happy are categories, so we turn them into factors with readable labels (Week 4!).
+
+#factor(variable, levels = the codes in the data, labels = what the codes mean -- in the same order, from the codebook)
+tg$gender_f <- factor(tg$gender, levels = c(1, 2), labels = c("Male", "Female"))
+
+tg$happy_f <- factor(tg$happy, levels = c(1, 2, 3, 4, 5),
+                     labels = c("Extremely unhappy", "Unhappy", "Neither", "Happy", "Extremely happy"))
+
+#Check: table() shows the labels instead of the numbers now
+table(tg$gender_f)
+table(tg$happy_f, useNA = "ifany")   #people who didn't answer stay NA
+
+#We keep the original numeric columns too -- the _f ("factor") versions are new columns.
+```
+
+# The Grammar of Graphics
+
+```{r}
+#Every ggplot is built from the same three ingredients -- this is the "grammar of graphics":
+##(1) DATA:       which data frame?                                    -> ggplot(data = tg)
+##(2) AESTHETICS: which variable goes where (x-axis, y-axis, color)?   -> aes(x = age)
+##(3) GEOM:       which shape draws the data (bars, points, boxes)?    -> geom_histogram()
+##The pieces are joined with a + sign, like building a plot layer by layer.
+
+#Let's build one step by step and look at the result after each step:
+
+#Step 1 -- only the data: R prepares an empty canvas
+ggplot(data = tg)
+```
+
+```{r}
+#Step 2 -- add the aesthetics: now ggplot knows that age goes on the x-axis, so it draws the axis
+ggplot(data = tg, aes(x = age))
+```
+
+```{r}
+#Step 3 -- add a geom: now the data is actually drawn, as a histogram
+ggplot(data = tg, aes(x = age)) +
+  geom_histogram()
+
+#WATCH OUT: the + must be at the END of a line, never at the start of the next one.
+##If a line starts with +, R thinks the plot was already finished on the line before.
+```
+
+# Plotting ONE Variable: Distributions
+
+```{r}
+#A HISTOGRAM shows the distribution of a NUMERIC variable: how many people fall into each range of values.
+##The message "stat_bin() using bins = 30" means ggplot chose the width of the bars for us.
+##We can choose it ourselves with binwidth -- here, each bar covers 5 years of age:
+ggplot(data = tg, aes(x = age)) +
+  geom_histogram(binwidth = 5)
+
+#Remember qplot(rolls, binwidth = 1) from our dice weeks? qplot() was a quick shortcut for ggplot().
+##It is now outdated, so from today on we write the full ggplot() version.
+```
+
+```{r}
+#Changing the color of the bars: fill = the inside color, color = the border color
+ggplot(data = tg, aes(x = age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", color = "white")
+
+#Notice: fill and color are written INSIDE geom_histogram(), not inside aes().
+##That means "make ALL bars this color". (Inside aes() means something else -- we'll see it in a minute.)
+```
+
+```{r}
+#A BAR CHART shows the distribution of a CATEGORICAL variable (a factor): how many people are in each category.
+ggplot(data = tg, aes(x = happy_f)) +
+  geom_bar()
+
+#If some people didn't answer the question, you will see a gray "NA" bar on the right.
+```
+
+```{r}
+#To leave out the people who didn't answer, use logical subsetting from last week:
+##!is.na(...) means "NOT missing" -> keep only the rows where happy_f has an answer
+tg_happy <- tg[!is.na(tg$happy_f), ]
+
+ggplot(data = tg_happy, aes(x = happy_f)) +
+  geom_bar(fill = "darkorange")
+
+#Histogram or bar chart? Ask yourself what kind of variable you have:
+##numeric (age, height...)          -> geom_histogram()
+##categorical / factor (happy_f...) -> geom_bar()
+```
+
+# Plotting TWO Variables: Relationships
+
+```{r}
+#Psychology question: do happier people trust others more?
+##A BOXPLOT compares a NUMERIC variable (trustpeople) across the groups of a CATEGORICAL variable (happy_f).
+##So now we need two aesthetics: x = the groups, y = the numeric variable.
+ggplot(data = tg_happy, aes(x = happy_f, y = trustpeople)) +
+  geom_boxplot()
+
+#How to read a boxplot:
+##the thick line in the middle = the median (half of the people are above it, half below)
+##the box = the middle 50% of the people
+##the lines (whiskers) = the rest of the typical range; single dots = unusual values (outliers)
+
+#You may see a warning like "Removed ... rows containing non-finite values":
+##those are people with NA on trustpeople. ggplot can't draw a missing value, so it skips them and tells you.
+```
+
+```{r}
+#A SCATTERPLOT shows the relationship between TWO NUMERIC variables: one point per person.
+ggplot(data = tg, aes(x = height, y = weight)) +
+  geom_point()
+
+#Taller people tend to be heavier -- the cloud of points goes up from left to right.
+##You will get a "Removed ... rows" warning again: height and weight were not asked to everyone, so many people have NA.
+##ggplot simply leaves them out of the plot.
+```
+
+```{r}
+#Adding a THIRD variable with color: put color INSIDE aes() and give it a variable.
+##Inside aes() means "color the points ACCORDING TO this variable" -- ggplot picks the colors and adds a legend.
+ggplot(data = tg, aes(x = height, y = weight, color = gender_f)) +
+  geom_point()
+
+#Compare with the histogram above:
+##geom_histogram(fill = "steelblue")   -> OUTSIDE aes(): one fixed color for everything
+##aes(color = gender_f)                -> INSIDE aes(): the color shows the values of a variable
+```
+
+```{r}
+#Too many points on top of each other? alpha makes them see-through (0 = invisible, 1 = solid).
+##Dark areas now show where many people are.
+ggplot(data = tg, aes(x = height, y = weight, color = gender_f)) +
+  geom_point(alpha = 0.4)
+```
+
+# Comparing Groups: Facets
+
+```{r}
+#Color is one way to compare groups. Another way is FACETS: one small plot per group, side by side.
+##facet_wrap(~ variable) splits the plot by the categories of that variable. Read the ~ as "split by".
+ggplot(data = tg, aes(x = height, y = weight)) +
+  geom_point(alpha = 0.4) +
+  facet_wrap(~ gender_f)
+
+#Same data as the colored scatterplot above -- but now men and women each get their own panel.
+##Facets are especially useful when colors would overlap too much.
+```
+
+```{r}
+#Facets work with any geom. Psychology question: do men and women answer the happiness question differently?
+ggplot(data = tg_happy, aes(x = happy_f)) +
+  geom_bar() +
+  facet_wrap(~ gender_f, ncol = 1)
+
+#ncol = 1 puts the panels on top of each other (1 column), so the long category names have enough space.
+```
+
+# Positions: Stacked, Side by Side, Jittered
+
+```{r}
+#Another way to compare two CATEGORICAL variables in one bar chart: fill the bars with a second variable.
+##fill = gender_f goes INSIDE aes(), because the color shows the values of a variable.
+ggplot(data = tg_happy, aes(x = happy_f, fill = gender_f)) +
+  geom_bar()
+
+#By default, the bars are STACKED on top of each other: position = "stack".
+```
+
+```{r}
+#position = "dodge" puts the bars SIDE BY SIDE -- easier to compare men and women in each category:
+ggplot(data = tg_happy, aes(x = happy_f, fill = gender_f)) +
+  geom_bar(position = "dodge")
+```
+
+```{r}
+#position = "fill" stretches every bar to the same height (1 = 100%), so you compare PROPORTIONS instead of counts:
+##"Among the extremely happy, what share are women?" -- useful when the groups have very different sizes.
+ggplot(data = tg_happy, aes(x = happy_f, fill = gender_f)) +
+  geom_bar(position = "fill") +
+  labs(y = "proportion")   #the y-axis now shows proportions, not counts, so we rename it
+```
+
+```{r}
+#Positions also solve a common problem with survey scales. Let's make a scatterplot of happy (1-5) and trustpeople (0-10):
+ggplot(data = tg, aes(x = happy, y = trustpeople)) +
+  geom_point()
+
+#Only a grid of dots! Answers can only be whole numbers, so hundreds of people sit on exactly the same spot.
+##You can't see where most people are.
+```
+
+```{r}
+#geom_jitter() moves every point a tiny random distance, so the hidden points become visible.
+##width and height control how far the points may move -- keep them small (less than half a step on the scale).
+ggplot(data = tg, aes(x = happy, y = trustpeople)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.3)
+
+#Now the dark clouds show where most respondents are. Jitter changes only the PICTURE -- the data itself stays the same.
+```
+
+# Making It Look Good: Titles, Themes and Saving
+
+```{r}
+#A plot for a report or a thesis needs clear labels. labs() changes the title and the axis/legend names:
+ggplot(data = tg, aes(x = height, y = weight, color = gender_f)) +
+  geom_point(alpha = 0.4) +
+  labs(title = "Height and weight of TGSS 2024 respondents",
+       x = "Height (cm)",
+       y = "Weight (kg)",
+       color = "Gender")
+```
+
+```{r}
+#A THEME changes the overall look of the plot (background, grid lines, fonts) -- not the data.
+##ggplot has several ready-made themes, each added with one more + line. Try a few:
+ggplot(data = tg, aes(x = height, y = weight, color = gender_f)) +
+  geom_point(alpha = 0.4) +
+  theme_minimal()   #also try: theme_classic(), theme_bw()
+```
+
+```{r}
+#theme() lets you customize details yourself. Here: bigger text, and the legend at the bottom of the plot.
+##Put it AFTER the ready-made theme, otherwise the ready-made theme overwrites your changes.
+ggplot(data = tg, aes(x = height, y = weight, color = gender_f)) +
+  geom_point(alpha = 0.4) +
+  labs(title = "Height and weight of TGSS 2024 respondents",
+       x = "Height (cm)",
+       y = "Weight (kg)",
+       color = "Gender") +
+  theme_minimal() +
+  theme(text = element_text(size = 14), legend.position = "bottom")
+```
+
+```{r}
+#ggsave() saves the LAST plot you made as an image file in your working directory (check with getwd()).
+##width and height are in inches; the file type comes from the ending of the file name (.png, .pdf, .jpg).
+##bg = "white" gives the image a white background (some themes, like theme_minimal(), are otherwise see-through).
+ggsave("height_weight.png", width = 6, height = 4, bg = "white")
+```
