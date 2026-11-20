@@ -1,0 +1,217 @@
+---
+title: "Week 10: Data Transformation – II (The Pipe, Grouped Summaries, Grouped Mutates and Filters)"
+output: html_notebook
+---
+
+```{r}
+#Last week we learned four dplyr verbs: filter() (rows), arrange() (order), select() (columns) and mutate() (new variables).
+##We also saw a problem: to do several steps, we had to create objects like step1, step2, step3.
+
+#Today:
+##(1) The PIPE %>%: chaining several steps together
+##(2) summarise(): turning many rows into one summary (a mean, a count...)
+##(3) group_by() + summarise(): the same summary for EACH group -- the heart of comparing groups
+##(4) count(): a quick way to count people in each group
+##(5) Grouped mutate() and filter(): calculations and filters inside each group
+##Textbook: Wickham & Grolemund, Chapter 5.
+```
+
+# Preparing the Data
+
+```{r}
+library(dplyr)
+library(haven)
+
+tgss <- read_sav("TGSS2024.sav")
+
+vars <- c("id", "age", "agegroup", "gender", "degree", "happy", "lifesat", "health", "trustpeople")
+tg <- tgss[, vars]
+tg <- as.data.frame(tg)
+tg <- zap_labels(tg)
+
+#Factors with readable labels for the groups we will compare (codes from the codebook):
+tg <- mutate(tg,
+  gender_f   = factor(gender, levels = c(1, 2), labels = c("Male", "Female")),
+  agegroup_f = factor(agegroup, levels = 1:6, labels = c("18-24", "25-34", "35-44", "45-54", "55-64", "65+")),
+  degree_f   = factor(degree, levels = 1:8,
+                      labels = c("No school", "Primary", "Lower secondary", "High school",
+                                 "Vocational (2-3 yrs)", "University", "Master's", "PhD")),
+  happy_f    = factor(happy, levels = 1:5,
+                      labels = c("Extremely unhappy", "Unhappy", "Neither", "Happy", "Extremely happy")))
+
+str(tg)
+```
+
+# The Pipe %>%
+
+```{r}
+#Last week's example, with a new object for every step:
+step1 <- filter(tg, gender == 2, age >= 65)
+step2 <- select(step1, id, age, lifesat)
+step3 <- arrange(step2, desc(lifesat))
+head(step3)
+```
+
+```{r}
+#The same thing with the PIPE %>% -- read it as "AND THEN":
+tg %>%
+  filter(gender == 2, age >= 65) %>%   #take tg, AND THEN keep women aged 65+,
+  select(id, age, lifesat) %>%         #AND THEN keep these columns,
+  arrange(desc(lifesat)) %>%           #AND THEN sort them,
+  head()                               #AND THEN show the first 6 rows
+
+#How it works: the pipe puts the result of the left side into the FIRST argument of the next function.
+##That's why we don't write the data frame inside filter(), select() or arrange() anymore -- the pipe passes it on.
+
+#Keyboard shortcut for %>%: Ctrl + Shift + M (Windows) or Cmd + Shift + M (Mac).
+##You may also see |> in other code: it is R's built-in pipe and works the same way for everything we do here.
+##WATCH OUT: like the + in ggplot, the %>% must be at the END of a line.
+```
+
+# summarise(): One Summary from Many Rows
+
+```{r}
+#summarise() collapses the whole data frame into ONE row of summary numbers: new_name = summary function
+tg %>%
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE),   #the average life satisfaction (Week 6: na.rm!)
+            sd_lifesat   = sd(lifesat, na.rm = TRUE),     #the standard deviation
+            n            = n())                           #n() counts the rows -- how many respondents
+
+#n() counts ALL rows, including people with NA on lifesat.
+##To count only the people who answered: sum(!is.na(lifesat)) -- the TRUE = 1 trick from Week 6.
+```
+
+# group_by() + summarise(): Comparing Groups
+
+```{r}
+#summarise() becomes really useful together with group_by():
+##group_by() splits the data into groups, and summarise() then calculates the summary for EACH group separately.
+tg %>%
+  group_by(gender_f) %>%
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE),
+            n = n())
+
+#One row per group: the average life satisfaction of men and of women, and how many people are in each group.
+##In Week 6, we needed one line per group: mean(tg$lifesat[tg$gender == 1], na.rm = TRUE)... Now one block does all groups.
+
+#You will see "# A tibble" above the result: after group_by(), dplyr returns a tibble -- the modern data frame from Week 6.
+##For summary tables like this one, that is perfectly fine; we just read the numbers.
+```
+
+```{r}
+#The same for age groups -- 6 groups, still one block of code:
+tg %>%
+  group_by(agegroup_f) %>%
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE),
+            mean_health  = mean(health, na.rm = TRUE),
+            n = n())
+```
+
+```{r}
+#Grouping by TWO variables gives one row for every combination (here: 2 genders x 6 age groups = 12 rows):
+tg %>%
+  group_by(gender_f, agegroup_f) %>%
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE),
+            n = n()) %>%
+  ungroup()
+
+#You may see the message "summarise() has grouped output by 'gender_f'": the result is still grouped by gender.
+##ungroup() removes the grouping -- a good habit at the end, so the next step is not grouped by accident.
+```
+
+```{r}
+#Why ungroup() matters -- the same calculation, two different questions:
+age_gender <- tg %>%
+  group_by(gender_f, agegroup_f) %>%
+  summarise(n = n())          #still grouped by gender_f!
+
+#1) Still grouped: sum(n) is the total of EACH gender separately
+age_gender %>%
+  mutate(share = n / sum(n))
+##Answers: "What percentage of MEN are 18-24?" -- the shares add up to 1 within each gender
+
+#2) After ungroup(): sum(n) is the total of EVERYONE
+age_gender %>%
+  ungroup() %>%
+  mutate(share = n / sum(n))
+##Answers: "What percentage of ALL respondents are men aged 18-24?" -- the shares add up to 1 across the whole table
+
+#Both are correct -- but they answer different questions. ungroup() makes sure you know which one you are calculating.
+```
+
+
+
+# count(): Counting People in Each Group
+
+```{r}
+#count() is a shortcut for group_by() + summarise(n = n()):
+tg %>%
+  count(happy_f)
+
+#Notice the NA row: people who didn't answer the happiness question form their own "group".
+##To leave them out, filter first:
+tg %>%
+  filter(!is.na(happy_f)) %>%
+  count(happy_f)
+```
+
+```{r}
+#count() with two variables: how many men and women are in each happiness category?
+tg %>%
+  filter(!is.na(happy_f)) %>%
+  count(gender_f, happy_f)
+```
+
+# Grouped mutate() and filter()
+
+```{r}
+#mutate() after group_by() calculates WITHIN each group.
+##Example: what PROPORTION of men and what proportion of women are in each happiness category?
+tg %>%
+  filter(!is.na(happy_f)) %>%
+  count(gender_f, happy_f) %>%
+  group_by(gender_f) %>%               #now each gender is a separate group...
+  mutate(prop = n / sum(n)) %>%        #...so sum(n) is the total of THAT gender, not of everyone
+  ungroup()
+
+#The proportions add up to 1 within each gender -- the same idea as position = "fill" in Week 7, now as numbers.
+```
+
+```{r}
+#filter() after group_by() keeps or drops WHOLE GROUPS.
+##Example: averages from very small groups are unreliable. Let's keep only the education groups with at least 100 people:
+tg %>%
+  group_by(degree_f) %>%
+  filter(n() >= 100) %>%               #n() = the size of each group
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE),
+            n = n())
+
+#Compare with the same code without the filter() line: the small groups (e.g. PhD) disappear from the table.
+```
+
+# Putting It Together: From Summary to Plot
+
+```{r}
+#The result of a pipe is a data frame -- so we can pipe it straight into ggplot() (Week 7)!
+library(ggplot2)
+
+tg %>%
+  group_by(agegroup_f) %>%
+  summarise(mean_lifesat = mean(lifesat, na.rm = TRUE)) %>%
+  ggplot(aes(x = agegroup_f, y = mean_lifesat)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Average life satisfaction by age group (TGSS 2024)",
+       x = "Age group", y = "Mean life satisfaction (1-5)")
+
+#geom_col() draws bars with the heights WE calculated (geom_bar() counts the rows for us).
+##Notice the switch: %>% between the data steps, + between the ggplot layers.
+```
+
+```{r}
+#NEW geom: geom_col() draws bars with the heights WE calculated (here: the means).
+##geom_bar() (Week 7) counts the rows itself -- but our summary table already has one row per group, so we need geom_col().
+```
+
+
+
+
