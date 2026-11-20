@@ -1,0 +1,169 @@
+---
+title: "Week 9: Data Transformation – I (Filter Rows, Select Columns, Arrange Rows, Add New Variables)"
+output: html_notebook
+---
+
+```{r}
+#Welcome back after the midterm!
+##In Week 6 we learned to work with data using square brackets: tg[rows, columns].
+##That works -- but long lines like tg[tg$gender == 2 & tg$age < 30, c("age", "happy")] are hard to read and easy to get wrong.
+
+#Today we learn the dplyr package: it does the same jobs with short, readable "verbs" (functions named after what they do):
+##(1) filter()  -> keep the ROWS that meet a condition
+##(2) arrange() -> change the ORDER of the rows
+##(3) select()  -> keep the COLUMNS you need
+##(4) mutate()  -> ADD new variables (columns)
+##These four verbs, plus the ones we learn next week, cover most of the data preparation you will ever do.
+##Textbook: Wickham & Grolemund, Chapter 5 (the book uses flight data -- we use TGSS).
+```
+
+# Preparing the Data
+
+```{r}
+#dplyr is a package: install it ONCE per computer (remove the # and run the line if you don't have it yet)...
+#install.packages("dplyr")
+
+#...and load it at the start of EVERY session, together with haven:
+library(dplyr)
+library(haven)
+
+#When you load dplyr, you may see a message like "The following objects are masked from 'package:stats': filter, lag".
+##This only means dplyr has its own filter() function, which now replaces an older one with the same name. Nothing is wrong.
+```
+
+```{r}
+#Load the TGSS data and prepare it exactly like in Week 6:
+tgss <- read_sav("TGSS2024.sav")
+
+vars <- c("id", "age", "gender", "degree", "happy", "lifesat", "health", "trustpeople", "height", "weight", "bmi",
+          "weldepp", "welhard", "welsleep", "welhappy", "welalone", "welenjoy", "welsad", "welstop")
+tg <- tgss[, vars]
+
+tg <- as.data.frame(tg)   #tibble -> classic data frame
+tg <- zap_labels(tg)      #remove the SPSS labels -> plain numbers
+
+str(tg)
+```
+
+# filter(): Keep the Rows You Need
+
+```{r}
+#All dplyr verbs work the same way:
+##the FIRST argument is the data frame, the next arguments say what to do, and the result is a NEW data frame.
+
+#filter() keeps only the rows where a condition is TRUE -- the same idea as logical subsetting in Week 6.
+filter(tg, age >= 65)   #respondents aged 65 or older
+
+#Notice: inside filter() we write just age, not tg$age. dplyr already knows that age is a column of tg.
+```
+
+```{r}
+#Compare with Week 6 -- these two lines keep exactly the same rows:
+older_brackets <- tg[tg$age >= 65, ]
+older_filter   <- filter(tg, age >= 65)
+
+nrow(older_brackets)
+nrow(older_filter)
+
+#IMPORTANT: filter() does NOT change tg. To keep the result, store it in a new object with <-
+```
+
+```{r}
+#All the logical operators from Week 6 work inside filter():
+
+filter(tg, gender == 2, age < 30)   #a comma means AND: women AND younger than 30
+filter(tg, age < 25 | age > 70)     #| means OR: the youngest OR the oldest respondents
+filter(tg, degree %in% c(6, 7, 8))  #%in%: university degree or higher (degree: 6 = university, 7 = master's, 8 = PhD)
+```
+
+```{r}
+#filter() and missing data: filter() keeps a row ONLY if the condition is TRUE -- rows where the answer is NA are dropped.
+##Square brackets behave differently: a row with NA in the condition comes back as a row full of NAs.
+nrow(tg[tg$happy == 5, ])     #includes "empty" NA rows for people who didn't answer happy
+nrow(filter(tg, happy == 5))  #only the people who really answered 5 ("extremely happy")
+
+#To find the people who did NOT answer, combine filter() with is.na() (Week 6!):
+no_answer <- filter(tg, is.na(happy))
+nrow(no_answer)
+```
+
+# arrange(): Change the Order of the Rows
+
+```{r}
+#arrange() sorts the rows by the values of a column -- from smallest to largest by default:
+head(arrange(tg, age))         #the youngest respondents first
+
+#desc() ("descending") reverses the order: from largest to smallest
+head(arrange(tg, desc(age)))   #the oldest respondents first
+```
+
+```{r}
+#Sort by two columns: first by the first one, and when there is a tie, by the second one:
+head(arrange(tg, desc(lifesat), age))   #the most satisfied first; within the same lifesat, the youngest first
+
+#Rows with NA are always put at the END, whichever direction you sort.
+```
+
+# select(): Keep the Columns You Need
+
+```{r}
+#select() keeps only the columns you name -- no quotes and no c() needed:
+head(select(tg, age, gender, happy))
+
+#A colon selects a RANGE of neighboring columns: everything from age to lifesat
+head(select(tg, age:lifesat))
+
+#A minus sign drops columns: everything EXCEPT id
+head(select(tg, -id))
+```
+
+```{r}
+#Helper functions save typing when many columns share a name pattern.
+##starts_with("wel") selects all 8 wellbeing items (weldepp, welhard, ... welstop) at once:
+wellbeing_items <- select(tg, id, starts_with("wel"))
+head(wellbeing_items)
+
+#rename() changes a column's name: new_name = old_name
+head(rename(tg, life_satisfaction = lifesat))
+```
+
+# mutate(): Add New Variables
+
+```{r}
+#mutate() adds new columns that are calculated from existing ones: new_column = calculation
+##Example: Body Mass Index = weight (kg) / height (m) squared. Height is in cm, so we divide it by 100 first.
+tg <- mutate(tg, bmi_calc = weight / (height / 100)^2)
+
+#TGSS already has a bmi column computed by the survey team -- our version should be (almost) the same:
+head(select(tg, height, weight, bmi, bmi_calc))
+
+#If height or weight is NA, bmi_calc is NA too -- just like in Week 6 calculations.
+```
+
+```{r}
+#You can create several new columns in ONE mutate(), separated by commas:
+tg <- mutate(tg,
+             older    = age >= 65,                    #a TRUE/FALSE column
+             gender_f = factor(gender, levels = c(1, 2),
+                               labels = c("Male", "Female")),   #a labelled factor (Week 7)
+             wellbeing = (happy + lifesat) / 2)       #the average of two 1-5 items: a simple wellbeing score
+
+head(select(tg, age, older, gender, gender_f, happy, lifesat, wellbeing))
+
+#Notice: this time we wrote tg <- mutate(tg, ...). Without "tg <-", the new columns would only be printed, not saved.
+```
+
+# Putting It Together
+
+```{r}
+#A research question: among women aged 65 or older, who is the most satisfied with life?
+##With dplyr, we answer it step by step -- each step is one verb, and each result is stored for the next step:
+step1 <- filter(tg, gender == 2, age >= 65)          #1. keep the rows: women aged 65+
+step2 <- select(step1, id, age, lifesat, wellbeing)  #2. keep the columns we need
+step3 <- arrange(step2, desc(lifesat))               #3. sort: the most satisfied first
+
+head(step3)
+
+#This works, but it creates many "step" objects that we only need once.
+##Next week we learn the PIPE, which chains these steps together without any extra objects.
+```
